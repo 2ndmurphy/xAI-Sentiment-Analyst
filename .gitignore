@@ -10,5 +10,7 @@ wheels/
 .venv
 
 # OUTPUT FILE
-tweets_sentiment.csv
 *.csv
+
+# Cookies from tweets
+*.json
