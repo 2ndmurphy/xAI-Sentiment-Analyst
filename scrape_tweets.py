@@ -1,4 +1,3 @@
-import re
 import os
 import json
 import asyncio
@@ -131,9 +130,8 @@ async def process_queries():
         print(f"\n[INFO] Memulai scraping untuk topik: '{query}'")
         await scrape_search(query)
 
-
-if __name__ == "__main__":
-    try:
-        asyncio.run(process_queries())
-    except KeyboardInterrupt as k:
-        print(f"[INFO] 🔴 Stopped by user {k}")
+# if __name__ == "__main__":
+#     try:
+#         asyncio.run(process_queries())
+#     except KeyboardInterrupt as k:
+#         print(f"[INFO] 🔴 Stopped by user {k}")
