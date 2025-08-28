@@ -12,5 +12,5 @@ wheels/
 # OUTPUT FILE
 *.csv
 
-# Cookies from tweets
+# Ignore json file
 *.json
