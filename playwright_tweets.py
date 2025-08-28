@@ -10,7 +10,7 @@ from helpers.preprocess import preprocess_text
 # ====== CONFIG ======
 COOKIES_FILE = "cookies.json"
 OUTPUT_FILE = "tweets_sentiment.csv"
-SEARCH_QUERIES = ["berita", "baru", "produk", "terbaru", "shopee99", "kesehatan", "olahraga", "ramai", "topik", "trending"]
+SEARCH_QUERIES = ["trending"]
 MAX_TWEETS = 100      # simpan tweet ketika sudah mencapai maksimal
 BATCH_SIZE = 10      # flush/simpan tiap 10 tweet yang sudah diekstrak
 
@@ -65,7 +65,7 @@ async def scrape_search(search_query):
         # buka halaman search langsung ke tab Latest
         url = f"https://x.com/search?q={search_query}&src=typed_query&f=live"
         await page.goto(url, wait_until='domcontentloaded', timeout=60000)
-        await page.wait_for_selector('article div[data-testid="tweetText"]')
+        await page.wait_for_selector('article div[data-testid="tweetText"]', timeout=120000)
 
         scraped = []
         seen = set()
@@ -82,7 +82,7 @@ async def scrape_search(search_query):
 
             for t in tweets:
                 try:
-                    text = await t.inner_text(timeout=60000)
+                    text = await t.inner_text(timeout=120000)
                     clean = preprocess_text(text)
 
                     # Jika preprocess_text() return tuple, ekstrak elemen pertama
@@ -110,10 +110,11 @@ async def scrape_search(search_query):
                             break
                 except Exception as e:
                     print(f"[ERROR] {e}")
+                    await page.reload(timeout=60000) # reload page kalau error timeout
 
             # scroll down
             await page.mouse.wheel(0, 2000)
-            await asyncio.sleep(2)
+            await asyncio.sleep(3)
         
         # simpan sisa batch kalau ada
         if scraped:
