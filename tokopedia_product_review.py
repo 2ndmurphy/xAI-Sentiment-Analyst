@@ -7,48 +7,36 @@ from playwright.async_api import async_playwright
 from helpers.preprocess import preprocess_text
 
 # ====== CONFIG ======
-COOKIES_FILE = "cookies.json"
-OUTPUT_FILE = "tweets_sentiment.csv"
-SEARCH_QUERIES = ["trending"]
-MAX_TWEETS = 100      # simpan tweet ketika sudah mencapai maksimal
-BATCH_SIZE = 10      # flush/simpan tiap 10 tweet yang sudah diekstrak
+COOKIES_FILE = "cookies_tokped.json"   # simpan cookies kalau butuh login
+OUTPUT_FILE = "tokped_reviews.csv"
+PRODUCT_URL = "https://www.tokopedia.com/namatoko/namaproduk"  # ganti link produk tokped
+MAX_REVIEWS = 100      # batas review yang mau diambil
+BATCH_SIZE = 10        # flush tiap 10 review
 
 # =========================
 # CSV HELPERS
 # =========================
 def ensure_csv_header(csv_path):
-    """
-    Ensure the CSV file has the correct header.
-    
-    Parameter:
-        csv_path: Path to the CSV file
-    """
     if not os.path.exists(csv_path):
         df = pd.DataFrame(columns=["timestamp", "raw", "clean"])
         df.to_csv(csv_path, index=False, encoding="utf-8")
 
 def save_batch(csv_path, batch):
-    """
-    Save a batch of tweets to the CSV file.
-    """
     if not batch:
         return
-
     df = pd.DataFrame(batch)
     df.to_csv(csv_path, index=False, mode='a', header=False, encoding="utf-8")
 
 # ====== SCRAPER ======
-async def scrape_search(search_query):
+async def scrape_reviews():
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=False)
         context = await browser.new_context()
 
-        # load cookies untuk auto login
+        # load cookies kalau ada
         try:
             with open(COOKIES_FILE, "r", encoding="utf-8") as f:
                 cookies = json.load(f)
-
-            # sanitize sameSite biar valid
             for c in cookies:
                 if "sameSite" in c:
                     if c["sameSite"] not in ["Strict", "Lax", "None"]:
@@ -60,11 +48,7 @@ async def scrape_search(search_query):
             print(f"[WARNING] gagal load cookies: {e}")
 
         page = await context.new_page()
-
-        # buka halaman search langsung ke tab Latest
-        url = f"https://x.com/search?q={search_query}&src=typed_query&f=live"
-        await page.goto(url, wait_until='domcontentloaded', timeout=60000)
-        await page.wait_for_selector('article div[data-testid="tweetText"]', timeout=120000)
+        await page.goto(PRODUCT_URL, wait_until='domcontentloaded', timeout=60000)
 
         scraped = []
         seen = set()
@@ -73,22 +57,22 @@ async def scrape_search(search_query):
         ensure_csv_header(OUTPUT_FILE)
         print(f"[INFO]📝 writing to {OUTPUT_FILE}")
 
-        print(f"[RUNNING] 🔍 Start scraping search query: {search_query} (CTRL+C to stop)")
+        print(f"[RUNNING] 🔍 Start scraping reviews from product: {PRODUCT_URL}")
 
-        while total_scraped < MAX_TWEETS:
-            # ambil tweet yang sudah ada di viewport
-            tweets = await page.locator('div[data-testid="tweetText"]').all()
+        while total_scraped < MAX_REVIEWS:
+            # ambil review dari halaman
+            reviews = await page.locator('span[data-testid="lblItemUlasan"]').all()
 
-            for t in tweets:
+            for r in reviews:
                 try:
-                    text = await t.inner_text(timeout=120000)
+                    text = await r.inner_text(timeout=30000)
                     clean = preprocess_text(text)
 
-                    # Jika preprocess_text() return tuple, ekstrak elemen pertama
                     if isinstance(clean, tuple):
                         clean_str = clean[0]
                     else:
                         clean_str = clean
+
                     if clean_str not in seen and clean_str.strip():
                         seen.add(clean_str)
                         scraped.append({
@@ -97,41 +81,34 @@ async def scrape_search(search_query):
                             "clean": clean_str
                         })
                         total_scraped += 1
-                        print(f"[+] PULL {len(tweets)} tweets")
-                        
+                        print(f"[+] PULL {len(reviews)} reviews")
+
                         # batch save
                         if len(scraped) >= BATCH_SIZE:
                             save_batch(OUTPUT_FILE, scraped)
-                            print(f"[INFO] 💾 Flushed {len(scraped)} tweets to {OUTPUT_FILE}")
+                            print(f"[INFO] 💾 Flushed {len(scraped)} reviews to {OUTPUT_FILE}")
                             scraped = []
-                        if total_scraped >= MAX_TWEETS:
-                            print(f"[INFO] 🔴 Batas maksimal tweets tercapai: {MAX_TWEETS}")
+                        if total_scraped >= MAX_REVIEWS:
+                            print(f"[INFO] 🔴 Batas maksimal review tercapai: {MAX_REVIEWS}")
                             break
                 except Exception as e:
                     print(f"[ERROR] {e}")
-                    await page.reload(timeout=60000) # reload page kalau error timeout
+                    await page.reload(timeout=60000)
 
-            # scroll down
+            # scroll down buat load review lebih banyak
             await page.mouse.wheel(0, 2000)
             await asyncio.sleep(3)
-        
-        # simpan sisa batch kalau ada
+
+        # simpan sisa batch
         if scraped:
             save_batch(OUTPUT_FILE, scraped)
-            print(f"[INFO] 💾 Flushed last {len(scraped)} tweets to {OUTPUT_FILE}")
+            print(f"[INFO] 💾 Flushed last {len(scraped)} reviews to {OUTPUT_FILE}")
 
-        print(f"\n[INFO] ✅ Selesai! Total {len(seen)} tweets saved to {OUTPUT_FILE}")
+        print(f"\n[INFO] ✅ Selesai! Total {len(seen)} reviews saved to {OUTPUT_FILE}")
 
         await context.close()
         await browser.close()
 
-async def process_queries():
-    for query in SEARCH_QUERIES:
-        print(f"\n[INFO] Memulai scraping untuk topik: '{query}'")
-        await scrape_search(query)
-
-# if __name__ == "__main__":
-#     try:
-#         asyncio.run(process_queries())
-#     except KeyboardInterrupt as k:
-#         print(f"[INFO] 🔴 Stopped by user {k}")
+# Run
+if __name__ == "__main__":
+    asyncio.run(scrape_reviews())
