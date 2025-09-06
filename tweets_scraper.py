@@ -1,10 +1,8 @@
-import os
 import json
 import asyncio
-import pandas as pd
 from datetime import datetime
 from playwright.async_api import async_playwright
-from helpers.preprocess import preprocess_text
+from helpers.csv_config import ensure_csv_header, save_batch
 
 # ====== CONFIG ======
 COOKIES_FILE = "cookies.json"      # file cookies hasil export dari browser
@@ -12,30 +10,6 @@ OUTPUT_FILE = "dataset_tweets.csv" # file output yang menyimpan hasil scrape
 SEARCH_QUERIES = ["samsung"]       # topik yang ingin di scrape
 MAX_TWEETS = 100                   # simpan tweet ketika sudah mencapai maksimal
 BATCH_SIZE = 10                    # flush/simpan tiap 10 tweet yang sudah diekstrak
-
-# =========================
-# CSV HELPERS
-# =========================
-def ensure_csv_header(csv_path):
-    """
-    Ensure the CSV file has the correct header.
-    
-    Parameter:
-        csv_path: Path to the CSV file
-    """
-    if not os.path.exists(csv_path):
-        df = pd.DataFrame(columns=["timestamp", "text"])
-        df.to_csv(csv_path, index=False, encoding="utf-8")
-
-def save_batch(csv_path, batch):
-    """
-    Save a batch of tweets to the CSV file.
-    """
-    if not batch:
-        return
-
-    df = pd.DataFrame(batch)
-    df.to_csv(csv_path, index=False, mode='a', header=False, encoding="utf-8")
 
 # =========================
 # SCRAPING SECTION
@@ -82,7 +56,7 @@ async def _extract_and_save_tweets(page, seen, scraped, total_scraped):
         tweets = await page.locator('div[data-testid="tweetText"]').all()
         for t in tweets:
             try:
-                text = await t.inner_text()
+                text = await t.inner_text(timeout=180000)
                 seen.add(text)
                 scraped.append({
                     "timestamp": datetime.now().isoformat(),
@@ -126,7 +100,7 @@ async def scrape_search(search_query):
         url = f"https://x.com/search?q={search_query}&src=typed_query&f=live"
         
         await page.goto(url, wait_until='domcontentloaded', timeout=60000)
-        await page.wait_for_selector('article div[data-testid="tweetText"]', timeout=120000)
+        await page.wait_for_selector('article div[data-testid="tweetText"]', timeout=180000)
         
         scraped = []
         seen = set()
@@ -144,7 +118,7 @@ async def scrape_search(search_query):
             save_batch(OUTPUT_FILE, scraped)
             print(f"💾[INFO] Flushed {len(scraped)} tweets terakhir ke {OUTPUT_FILE}")
 
-        print(f"\n✅[INFO] Selesai! Total {len(seen)} tweets tersimpan di {OUTPUT_FILE}")
+        print(f"\n✅[INFO] Selesai! Total {len(total_scraped)} tweets tersimpan di {OUTPUT_FILE}")
         
         await context.close()
         await browser.close()
@@ -157,7 +131,7 @@ async def process_queries():
 
     """
     for query in SEARCH_QUERIES:
-        print(f"\n[INFO] Memulai scraping untuk topik: '{query}'")
+        print(f"\n📝[INFO] Memulai scraping untuk topik: '{query}'")
         await scrape_search(query)
 
 if __name__ == "__main__":

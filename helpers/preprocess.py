@@ -20,19 +20,84 @@ try:
         nltk.download("stopwords")
     EN_STOPWORDS = set(stopwords.words("english"))
 except Exception:
-    EN_STOPWORDS = set([
-        "the","and","is","in","it","of","to","a","for","on","that","this","with","as","are",
-        "was","be","by","an","or","from","at","not","have","has","but","they","you","i"
-    ])
+    EN_STOPWORDS = {
+        "the",
+        "and",
+        "is",
+        "in",
+        "it",
+        "of",
+        "to",
+        "a",
+        "for",
+        "on",
+        "that",
+        "this",
+        "with",
+        "as",
+        "are",
+        "was",
+        "be",
+        "by",
+        "an",
+        "or",
+        "from",
+        "at",
+        "not",
+        "have",
+        "has",
+        "but",
+        "they",
+        "you",
+        "i",
+    }
 
-ID_STOPWORDS = set([
-    "yang","dan","di","ke","dari","pada","untuk","dengan","atau","ini","itu","adalah",
-    "sebagai","oleh","karena","agar","sampai","juga","sudah","belum","masih","apa","siapa",
-    "dimana","kapan","kenapa","berapa","sebuah","beberapa","tetapi","jadi","agar","pun",
-    "nya","nya","lah","kah","itu","ini","kami","kita","saya","dia","mereka","kalian","kamu"
-])
+ID_STOPWORDS = {
+    "yang",
+    "dan",
+    "di",
+    "ke",
+    "dari",
+    "pada",
+    "untuk",
+    "dengan",
+    "atau",
+    "adalah",
+    "sebagai",
+    "oleh",
+    "karena",
+    "sampai",
+    "juga",
+    "sudah",
+    "belum",
+    "masih",
+    "apa",
+    "siapa",
+    "dimana",
+    "kapan",
+    "kenapa",
+    "berapa",
+    "sebuah",
+    "beberapa",
+    "tetapi",
+    "jadi",
+    "agar",
+    "pun",
+    "nya",
+    "lah",
+    "kah",
+    "itu",
+    "ini",
+    "kami",
+    "kita",
+    "saya",
+    "dia",
+    "mereka",
+    "kalian",
+    "kamu",
+}
 
-STOPWORDS = set(w.lower() for w in (EN_STOPWORDS | ID_STOPWORDS))
+STOPWORDS = {w.lower() for w in (EN_STOPWORDS | ID_STOPWORDS)}
 
 URL_RE = re.compile(r"https?://\S+|www\.\S+")
 MENTION_RE = re.compile(r"@\w+")
@@ -66,11 +131,9 @@ def preprocess_text(text,
 
     s = URL_RE.sub(" ", s)
     s = MENTION_RE.sub(" ", s)
-    if not keep_hashtags:
-        s = HASHTAG_RE.sub(" ", s)
-    else:
-        s = re.sub(r"#(\w+)", r"\1", s)
-
+    s = (
+        re.sub(r"#(\w+)", r" \1", s) if keep_hashtags else HASHTAG_RE.sub(" ", s)
+    )
     s = NON_ALPHANUM_RE.sub(" ", s)
 
     s = MULTISPACE_RE.sub(" ", s).strip()
@@ -107,5 +170,4 @@ def preprocess_text(text,
 
         processed.append(t_stem)
 
-    cleaned = " ".join(processed)
-    return cleaned  # Return string cleaned untuk scraping
+    return " ".join(processed)
