@@ -4,22 +4,23 @@ from datetime import datetime
 from playwright.async_api import async_playwright
 from helpers.preprocess import preprocess_text
 from helpers.csv_config import ensure_csv_header, save_batch
+from tweets_scraper import OUTPUT_FILE
 
 # ====== CONFIG ======
-COOKIES_FILE = "cookies.json"
-OUTPUT_FILE = "tweets_sentiment.csv"
-MAX_TWEETS = 100      # simpan tweet ketika sudah mencapai maksimal
-BATCH_SIZE = 10      # flush/simpan tiap 10 tweet yang sudah diekstrak
+# COOKIES_FILE = "cookies.json"
+# OUTPUT_FILE = "tweets_sentiment.csv"
+# MAX_TWEETS = 100      
+# BATCH_SIZE = 10      
 
 # ====== SCRAPER ======
-async def scrape_search(search_query):
+async def scrape_search(search_query, cookies_file="cookies.json", batch_size=10, max_tweets=100, output_file="data_tweets.csv"):
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False)
+        browser = await p.firefox.launch(headless=True)
         context = await browser.new_context()
-
+        
         # load cookies untuk auto login
         try:
-            with open(COOKIES_FILE, "r", encoding="utf-8") as f:
+            with open(cookies_file, "r", encoding="utf-8") as f:
                 cookies = json.load(f)
 
             # sanitize sameSite biar valid
@@ -44,12 +45,12 @@ async def scrape_search(search_query):
         seen = set()
         total_scraped = 0
 
-        ensure_csv_header(OUTPUT_FILE)
-        print(f"[INFO]📝 writing to {OUTPUT_FILE}")
+        ensure_csv_header(output_file)
+        print(f"[INFO]📝 writing to {output_file}")
 
         print(f"[RUNNING] 🔍 Start scraping search query: {search_query} (CTRL+C to stop)")
 
-        while total_scraped < MAX_TWEETS:
+        while total_scraped < max_tweets:
             # ambil tweet yang sudah ada di viewport
             tweets = await page.locator('div[data-testid="tweetText"]').all()
 
@@ -74,12 +75,12 @@ async def scrape_search(search_query):
                         print(f"[+] PULL {len(tweets)} tweets")
                         
                         # batch save
-                        if len(scraped) >= BATCH_SIZE:
+                        if len(scraped) >= batch_size:
                             save_batch(OUTPUT_FILE, scraped)
                             print(f"[INFO] 💾 Flushed {len(scraped)} tweets to {OUTPUT_FILE}")
                             scraped = []
-                        if total_scraped >= MAX_TWEETS:
-                            print(f"[INFO] 🔴 Batas maksimal tweets tercapai: {MAX_TWEETS}")
+                        if total_scraped >= max_tweets:
+                            print(f"[INFO] 🔴 Batas maksimal tweets tercapai: {max_tweets}")
                             break
                 except Exception as e:
                     print(f"[ERROR] {e}")

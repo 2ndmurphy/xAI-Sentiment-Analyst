@@ -14,6 +14,7 @@ BATCH_SIZE = 10                    # flush/simpan tiap 10 tweet yang sudah dieks
 # =========================
 # SCRAPING SECTION
 # =========================
+
 async def _load_and_set_cookies(context):
     """
     Loads cookies from a file and sets them in the browser context.
@@ -26,16 +27,40 @@ async def _load_and_set_cookies(context):
     """
     try:
         with open(COOKIES_FILE, "r", encoding="utf-8") as f:
-            cookies = json.load(f)
-        for c in cookies:
-            if "sameSite" in c:
-                if c["sameSite"] not in ["Strict", "Lax", "None"]:
-                    c["sameSite"] = "Lax"
+            raw_cookies = json.load(f)
+
+        cookies = []
+        for c in raw_cookies:
+            cookie = {
+                "name": c["name"],
+                "value": c["value"],
+                "domain": c["domain"],
+                "path": c.get("path", "/"),
+                "secure": c.get("secure", False),
+                "httpOnly": c.get("httpOnly", False),
+            }
+
+            # handle expiration
+            if "expirationDate" in c and c["expirationDate"] is not None:
+                cookie["expires"] = int(c["expirationDate"])
             else:
-                c["sameSite"] = "Lax"
+                cookie["expires"] = -1  # session cookie
+
+            # fix sameSite
+            same_site = str(c.get("sameSite", "")).capitalize()
+            if same_site == "No_restriction":
+                cookie["sameSite"] = "None"
+            elif same_site in ["Lax", "Strict", "None"]:
+                cookie["sameSite"] = same_site
+            else:
+                cookie["sameSite"] = "Lax"
+
+            cookies.append(cookie)
+
         await context.add_cookies(cookies)
     except Exception as e:
         print(f"🔴[WARNING] gagal load cookies: {e}")
+
 
 async def _extract_and_save_tweets(page, seen, scraped, total_scraped):
     """
@@ -91,7 +116,7 @@ async def scrape_search(search_query):
         search_query: The search term to use for scraping tweets.
     """
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False)
+        browser = await p.chromium.launch(headless=True)
         context = await browser.new_context()
         
         await _load_and_set_cookies(context)
@@ -138,4 +163,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(process_queries())
     except KeyboardInterrupt as k:
-        print(f"[INFO] 🔴 Stopped by user {k}")
+        print(f"[INFO] 🔴 Dihentikan oleh user {k}")

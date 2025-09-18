@@ -14,5 +14,8 @@ wheels/
 
 # Ignore json file
 cookies.json
-
 .vscode/
+
+# debug
+*.log
+backend/debug
