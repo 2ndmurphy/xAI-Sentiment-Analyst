@@ -1,60 +1,3 @@
-# from playwright.async_api import async_playwright
-
-# async def scrape_tweets(username: str, limit: int = 10):
-#     tweets = []
-#     async with async_playwright() as p:
-#         browser = await p.chromium.launch(headless=True)
-#         page = await browser.new_page()
-#         await page.goto(f"https://twitter.com/{username}")
-
-#         # contoh dummy (beneran scraping bisa pakai locator/selector)
-#         tweets = [f"Tweet ke {i + 1} dari @{username}" for i in range(limit)]
-#         await browser.close()
-#     return tweets
-
-# import re
-# from datetime import datetime
-# from playwright.async_api import async_playwright
-
-# async def scrape_tweets(search_query: str, max_tweets: int = 20):
-#     """
-#     Scrapes tweets from X (Twitter) search results for a given query.
-#     Return list of dict (JSON serializable).
-#     """
-#     tweets = []
-#     MULTISPACE_RE = re.compile(r"\s+")
-
-#     async with async_playwright() as p:
-#         browser = await p.chromium.launch(headless=True)
-#         context = await browser.new_context()
-#         page = await context.new_page()
-
-#         url = f"https://twitter.com/search?q={search_query}&src=typed_query&f=live"
-#         await page.goto(url, wait_until='domcontentloaded', timeout=60000)
-#         await page.wait_for_selector('article div[data-testid="tweetText"]', timeout=180000)
-
-#         while len(tweets) < max_tweets:
-#             elements = await page.locator('div[data-testid="tweetText"]').all()
-#             for el in elements:
-#                 if len(tweets) >= max_tweets:
-#                     break
-#                 try:
-#                     text = await el.inner_text()
-#                     tweets.append({
-#                         "timestamp": datetime.now().isoformat(),
-#                         "text": MULTISPACE_RE.sub(" ", text).strip()
-#                     })
-#                 except Exception as e:
-#                     print(f"[ERROR] {e}")
-
-#             # scroll biar load tweet baru
-#             await page.mouse.wheel(0, 2000)
-#             await page.wait_for_timeout(2000)
-
-#         await browser.close()
-
-#     return tweets
-
 import json
 import os
 import re
@@ -63,10 +6,6 @@ from datetime import datetime
 from urllib.parse import quote_plus
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
 
-# optional: import your csv helpers if you still want to save batches
-# from helpers.csv_config import ensure_csv_header, save_batch
-
-# config (gunakan yg sama seperti project lo)
 COOKIES_FILE = "cookies.json"
 OUTPUT_FILE = "dataset_tweets.csv"
 BATCH_SIZE = 10
@@ -100,20 +39,13 @@ def save_batch(csv_path, batch):
 # PREPROCESS TEXT
 # =========================
 def preprocess_text(text):
-    """
-    Preprocess tweet text by stripping extra spaces and newlines.
-    """
-    MULTISPACE_RE = re.compile(r"\s+")
-
-    new_text = []
-    for t in text.split(" "):
-        t = '' if t.startswith('@') and len(t) > 1 else t
-        t = '' if t.startswith('https') else t
-        t = MULTISPACE_RE.sub(" ", t).strip()
-        if t:
-            new_text.append(t)
-
-    return " ".join(new_text)
+    # hapus URL (http/https/t.co/bit.ly dll)
+    text = re.sub(r"http\S+", "", text) 
+    # hapus mention @username
+    text = re.sub(r"@\w+", "", text)
+    # ganti multiple whitespace/newline jadi 1 spasi
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
 
 
 async def _load_and_set_cookies(context, cookies_file=COOKIES_FILE):
@@ -203,7 +135,7 @@ async def scrape_search(search_query: str,
 
         try:
             # 2) navigate - gunakan networkidle untuk SPA
-            await page.goto(url, wait_until="networkidle", timeout=60000)
+            await page.goto(url, wait_until="networkidle", timeout=120000)
 
             # 3) cek apakah login diperlukan
             logged_in = await _is_logged_in(page)

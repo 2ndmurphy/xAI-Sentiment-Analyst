@@ -15,5 +15,7 @@ dependencies = [
     "playwright>=1.54.0",
     "sastrawi>=1.0.1",
     "streamlit>=1.48.1",
+    "torch>=2.8.0",
+    "transformers>=4.56.1",
     "uvicorn>=0.35.0",
 ]
