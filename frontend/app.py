@@ -1,62 +1,29 @@
 import streamlit as st
 import httpx
 import pandas as pd
-import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-import re
+from sentiment import SentimentAnalyzer
+from visualize import plot_bar_chart, plot_pie_chart, plot_wordcloud, plot_ngram
 
-# =====================
-# Sentiment Analyzer
-# =====================
-class SentimentAnalyzer:
-    def __init__(self, model_name="model/twitter-xlm-roberta"):
-        self.labels = ["Negative", "Neutral", "Positive"]
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False)
-        self.model = AutoModelForSequenceClassification.from_pretrained(model_name)
-
-    def clean_text(self, text: str) -> str:
-        text = re.sub(r"http\S+", "", text)
-        text = re.sub(r"@\w+", "@user", text)
-        text = re.sub(r"#\w+", "", text)
-        text = re.sub(r"\s+", " ", text)
-        return text.strip()
-
-    def predict_batch(self, texts: list) -> pd.DataFrame:
-        results = []
-        for text in texts:
-            cleaned = self.clean_text(text)
-            inputs = self.tokenizer(cleaned, return_tensors="pt", truncation=True, padding=True)
-            with torch.no_grad():
-                outputs = self.model(**inputs)
-                probs = torch.nn.functional.softmax(outputs.logits, dim=-1).cpu().numpy()[0]
-            pred_idx = probs.argmax()
-            results.append({
-                "text": text,
-                "cleaned_text": cleaned,
-                "label": self.labels[pred_idx],
-                "Negative": float(probs[0]),
-                "Neutral": float(probs[1]),
-                "Positive": float(probs[2])
-            })
-        return pd.DataFrame(results)
-
-
-# =====================
-# Streamlit App
-# =====================
 API_URL = "http://127.0.0.1:8000/scrape"
 
 st.set_page_config(page_title="Tweet Scraper + Analyzer", layout="wide")
 st.title("🐦 Tweet Scraper + Analyzer")
 
+# ================================
+# Inisialisasi Session State
+# ================================
+if "df" not in st.session_state:
+    st.session_state.df = None
+if "analyzed" not in st.session_state:
+    st.session_state.analyzed = False
+
+# ================================
 # Scraping Form
+# ================================
 with st.form("scrape_form"):
     query = st.text_input("🔍 Masukkan keyword/topik")
     limit = st.slider("Jumlah tweet", 10, 200, 20)
     submitted = st.form_submit_button("Mulai Scrape")
-
-if "df" not in st.session_state:
-    st.session_state.df = None
 
 if submitted:
     if not query.strip():
@@ -71,6 +38,7 @@ if submitted:
                     if tweets:
                         df = pd.DataFrame(tweets)
                         st.session_state.df = df
+                        st.session_state.analyzed = False
                         st.success(f"✅ Dapat {data['count']} tweets untuk '{data['query']}'")
                         st.dataframe(df, use_container_width=True)
                     else:
@@ -80,20 +48,32 @@ if submitted:
             except Exception as e:
                 st.error(f"Gagal konek ke backend: {e}")
 
-# Analisis Sentimen
+# ================================
+# Analisis Sentimen + Visualisasi
+# ================================
 if st.session_state.df is not None:
-    if st.button("Analisis Sentimen"):
+    if st.button("🚀 Analisis Sentimen"):
         analyzer = SentimentAnalyzer()
         with st.spinner("🧠 Analisis sentimen..."):
-            result_df = analyzer.predict_batch(st.session_state.df["text"].tolist())
+            result_df = analyzer.predict_batch(st.session_state.df["text"].dropna().tolist())
             st.session_state.df = pd.concat(
                 [st.session_state.df.reset_index(drop=True), result_df[["label", "cleaned_text"]]], axis=1
             )
-
+        st.session_state.analyzed = True
         st.success("✅ Analisis sentimen selesai!")
         st.dataframe(st.session_state.df, use_container_width=True)
 
-        # Statistik label
-        st.subheader("📊 Distribusi Sentimen")
-        label_counts = st.session_state.df["label"].value_counts()
-        st.bar_chart(label_counts)
+if st.session_state.analyzed and st.session_state.df is not None:
+    st.subheader("👁️ Visualisasi Sentimen")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        plot_bar_chart(st.session_state.df)
+    with col2:
+        plot_pie_chart(st.session_state.df)
+
+    col3, col4 = st.columns(2)
+    with col3:
+        plot_wordcloud(st.session_state.df)
+    with col4:
+        plot_ngram(st.session_state.df, n=2)  # contoh bigram
