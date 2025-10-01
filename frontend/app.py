@@ -1,13 +1,18 @@
+import os
+from dotenv import load_dotenv
 import streamlit as st
 import httpx
 import pandas as pd
-from sentiment import SentimentAnalyzer
 from visualize import plot_bar_chart, plot_pie_chart, plot_wordcloud, plot_ngram
 
-API_URL = "http://127.0.0.1:8000/scrape"
+# ================================
+# Inisialisasi Environtment
+# ================================
+load_dotenv()
+API_URL = os.getenv("BASE_URL")
 
-st.set_page_config(page_title="Tweet Scraper + Analyzer", layout="wide")
-st.title("🐦 Tweet Scraper + Analyzer")
+st.set_page_config(page_title="xAI Sentiment Analyst", layout="wide")
+st.title("🐦 xAI Sentiment Analyst")
 
 # ================================
 # Inisialisasi Session State
@@ -31,7 +36,11 @@ if submitted:
     else:
         with st.spinner("⚡ Scraping in progress..."):
             try:
-                resp = httpx.post(API_URL, json={"query": query, "limit": limit}, timeout=120.0)
+                resp = httpx.post(
+                    f"{API_URL}/scrape",
+                    json={"query": query, "limit": limit},
+                    timeout=120.0,
+                )
                 if resp.status_code == 200:
                     data = resp.json()
                     tweets = data.get("tweets", [])
@@ -39,7 +48,9 @@ if submitted:
                         df = pd.DataFrame(tweets)
                         st.session_state.df = df
                         st.session_state.analyzed = False
-                        st.success(f"✅ Dapat {data['count']} tweets untuk '{data['query']}'")
+                        st.success(
+                            f"✅ Dapat {data['count']} tweets untuk '{data['query']}'"
+                        )
                         st.dataframe(df, use_container_width=True)
                     else:
                         st.warning("Tidak ada tweet yang berhasil diambil.")
@@ -53,15 +64,43 @@ if submitted:
 # ================================
 if st.session_state.df is not None:
     if st.button("🚀 Analisis Sentimen"):
-        analyzer = SentimentAnalyzer()
-        with st.spinner("🧠 Analisis sentimen..."):
-            result_df = analyzer.predict_batch(st.session_state.df["text"].dropna().tolist())
-            st.session_state.df = pd.concat(
-                [st.session_state.df.reset_index(drop=True), result_df[["label", "cleaned_text"]]], axis=1
-            )
-        st.session_state.analyzed = True
-        st.success("✅ Analisis sentimen selesai!")
-        st.dataframe(st.session_state.df, use_container_width=True)
+        texts = st.session_state.df["text"].dropna().tolist()
+        if not texts:
+            st.warning("⚠️ Tidak ada teks untuk dianalisis.")
+        else:
+            with st.spinner("🧠 Mengirimkan ke server untuk analisis..."):
+                try:
+                    resp = httpx.post(
+                        f"{API_URL}/analyze", json={"texts": texts}, timeout=300.0
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        result_df = pd.DataFrame(data["results"])
+                        # merge results back into original df (keep order)
+                        cols = [
+                            "label",
+                            "cleaned_text",
+                            "Negative",
+                            "Neutral",
+                            "Positive",
+                        ]
+                        st.session_state.df = pd.concat(
+                            [
+                                st.session_state.df.reset_index(drop=True),
+                                result_df[cols].reset_index(drop=True),
+                            ],
+                            axis=1,
+                        )
+                        st.session_state.analyzed = True
+                        st.success("✅ Analisis sentimen selesai!")
+                        st.dataframe(st.session_state.df, use_container_width=True)
+                    else:
+                        st.error(
+                            f"Analisis gagal. Status code: {resp.status_code} - {resp.text}"
+                        )
+                except Exception as e:
+                    st.error(f"Terjadi suatu kesalahan: {e}")
+
 
 if st.session_state.analyzed and st.session_state.df is not None:
     st.subheader("👁️ Visualisasi Sentimen")
@@ -76,4 +115,4 @@ if st.session_state.analyzed and st.session_state.df is not None:
     with col3:
         plot_wordcloud(st.session_state.df)
     with col4:
-        plot_ngram(st.session_state.df, n=2)  # contoh bigram
+        plot_ngram(st.session_state.df, n=1)

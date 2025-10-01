@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "asyncio>=4.0.0",
+    "dotenv>=0.9.9",
     "emoji>=2.14.1",
     "fastapi>=0.116.2",
     "httpx>=0.28.1",

@@ -35,6 +35,7 @@ def save_batch(csv_path, batch):
     df = pd.DataFrame(batch)
     df.to_csv(csv_path, index=False, mode='a', header=False, encoding="utf-8")
 
+
 # =========================
 # PREPROCESS TEXT
 # =========================
@@ -48,6 +49,9 @@ def preprocess_text(text):
     return text
 
 
+# =========================
+# LOAD & INJECT COOKIES
+# =========================
 async def _load_and_set_cookies(context, cookies_file=COOKIES_FILE):
     """
     Returns True if cookies loaded+set, False otherwise.
