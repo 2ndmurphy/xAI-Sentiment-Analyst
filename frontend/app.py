@@ -37,7 +37,7 @@ if submitted:
         with st.spinner("⚡ Scraping in progress..."):
             try:
                 resp = httpx.post(
-                    f"{API_URL}/scrape",
+                    "http://localhost:8000/scrape",
                     json={"query": query, "limit": limit},
                     timeout=120.0,
                 )
@@ -71,7 +71,7 @@ if st.session_state.df is not None:
             with st.spinner("🧠 Mengirimkan ke server untuk analisis..."):
                 try:
                     resp = httpx.post(
-                        f"{API_URL}/analyze", json={"texts": texts}, timeout=300.0
+                        "http://localhost:8000/analyze", json={"texts": texts}, timeout=300.0
                     )
                     if resp.status_code == 200:
                         data = resp.json()

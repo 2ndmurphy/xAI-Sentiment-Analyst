@@ -6,7 +6,7 @@ from datetime import datetime
 from urllib.parse import quote_plus
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
 
-COOKIES_FILE = "cookies.json"
+COOKIES_FILE = os.path.join(os.path.dirname(__file__), "cookies.json")
 OUTPUT_FILE = "dataset_tweets.csv"
 BATCH_SIZE = 10
 DEFAULT_MAX = 100

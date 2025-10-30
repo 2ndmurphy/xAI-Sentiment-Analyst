@@ -31,8 +31,8 @@ class AnalyzeRequest(BaseModel):
     texts: List[str]
 
 
-MODEL = "services/model/twitter-xlm-roberta"
-analyzer = SentimentAnalyzer(MODEL)
+# MODEL = "services/model/xlm-roberta-base"
+analyzer = SentimentAnalyzer()
 
 
 @app.get("/")

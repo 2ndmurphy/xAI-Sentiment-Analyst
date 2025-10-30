@@ -17,7 +17,9 @@ REPEAT_CHARS = re.compile(r"(.)\1{2,}")
 
 
 class SentimentAnalyzer:
-    def __init__(self, model_name="model/twitter-xlm-roberta", device=None):
+    def __init__(
+        self, model_name="cardiffnlp/twitter-xlm-roberta-base-sentiment", device=None
+    ):
         self.labels = ["Negative", "Neutral", "Positive"]
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         # set use_fast=False only if you need it; fast tokenizers are usually faster
@@ -72,7 +74,7 @@ class SentimentAnalyzer:
 
         return text
 
-    def _predict_chunk(self, texts: List[str]) -> List[Dict]:
+    def _predict_chunk(self, texts: list[str]) -> list[dict]:
         cleaned = [self.clean_text(t) for t in texts]
         inputs = self.tokenizer(
             cleaned, return_tensors="pt", padding=True, truncation=True, max_length=512
